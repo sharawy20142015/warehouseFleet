@@ -116,7 +116,8 @@ class Oa_maintenance:
                 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8,
                 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
             }
-            self.database['plate number']=self.database['Vehicle ID'].apply(changeletter)
+            
+            self.database['plate number']=self.database[self.database.columns[0]].apply(changeletter)
             self.database[['Letters', 'Numbers']] = self.database['plate number'].apply(lett_num).apply(pd.Series)
             self.database['new plate number']=self.database['Letters']+self.database['Numbers']
             self.database.rename(columns={self.database.columns[0]:'VPlate Number'},inplace=True)
@@ -162,10 +163,11 @@ class Oa_maintenance:
                             self.data = self.data.reset_index()
                             self.data['Date2']=self.data['Date'].shift(1)
                             self.data['DateDifference'] = (self.data['Date'] - self.data['Date2']).dt.days
-                            self.data['Target Total KM']=self.data['DateDifference'].astype('float')* self.data['avg km_day'].astype('float')
+                            self.data['predict Total KM']=self.data['DateDifference'].astype('float')* self.data['avg km_day'].astype('float')
                             self.data['Actual difference KM']=self.data['Current KM'].astype('float')-self.data['Last Maintenance KM'].astype('float')
+                            self.data['rest']=self.data['km to change oil'].fillna(0)-self.data['Actual difference KM'].fillna(0)
                             self.data=self.data.set_index('Date')
-                            self.data=self.data[['kind data', 'Needs', 'Quantity', 'Vehicle Type','Target Total KM','Actual difference KM','DateDifference'] + [column for column in self.data.columns if column not in ['kind data', 'Needs', 'Quantity', 'Vehicle Type','Target Total KM','Actual difference KM','DateDifference']]]
+                            self.data=self.data[['kind data', 'Needs', 'Quantity', 'Vehicle Type','predict Total KM','Actual difference KM','rest','DateDifference'] + [column for column in self.data.columns if column not in ['kind data','rest', 'Needs', 'Quantity', 'Vehicle Type','predict Total KM','Actual difference KM','DateDifference']]]
                             self.data.drop(columns=['Date2','others','others2','concat','Letters','Numbers','new plate number_y'],inplace=True)
                             st.dataframe(self.data)
             else:
