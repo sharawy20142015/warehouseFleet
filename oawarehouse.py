@@ -26,6 +26,9 @@ sh = gc.open_by_url(google_sheet_url)
 worksheet1 = sh.get_worksheet(0)
 all_values = worksheet1.get_all_values()
 old_data = pd.DataFrame(all_values[1:], columns=all_values[0])
+worksheet2 = sh.get_worksheet(1)
+all_values = worksheet2.get_all_values()
+database = pd.DataFrame(all_values[1:], columns=all_values[0]) 
 needs=old_data['Needs'].unique().tolist()
 old_data['Date'] = pd.to_datetime(old_data[['Year', 'Month', 'Day']], format='%Y-%m-%d')
 old_data.drop(columns=['Year', 'Month', 'Day'],inplace=True)
@@ -34,8 +37,9 @@ category=['Select Category', 'All'] + needs_catgory
 select=st.sidebar.selectbox('Category',category)
 check=st.sidebar.button('Check')
 class Oa_maintenance:
-    def __init__(self,old_data):
+    def __init__(self,old_data,database):
         self.old_data=old_data
+        self.database=database
     def df_(self):
         try:
             xls = pd.ExcelFile(uploaded_file)
@@ -112,6 +116,11 @@ class Oa_maintenance:
                 'May': 5, 'Jun': 6, 'Jul': 7, 'Aug': 8,
                 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
             }
+            self.database['plate number']=self.database['Vehicle ID'].apply(changeletter)
+            self.database[['Letters', 'Numbers']] = self.database['plate number'].apply(lett_num).apply(pd.Series)
+            self.database['new plate number']=self.database['Letters']+self.database['Numbers']
+            self.database.rename(columns={self.database.columns[0]:'VPlate Number'},inplace=True)
+            self.database['VPlate Number']=self.database['new plate number']
             self.new_data['Month'] = self.new_data['Month'].replace(month_mapping)
             self.new_data['plate number']=self.new_data.iloc[:, 5].apply(changeletter)
             self.new_data[['Letters', 'Numbers']] = self.new_data['plate number'].apply(lett_num).apply(pd.Series)
@@ -124,6 +133,7 @@ class Oa_maintenance:
             self.new_data['concat'] = self.new_data['Date'].dt.strftime('%Y-%m-%d') + self.new_data['Needs'].astype(str)
             self.df['concat'] = self.df['Date'].dt.strftime('%Y-%m-%d') + self.df['Needs'].astype(str)
             self.df['kind data'] = np.where(self.df['concat'].isin(self.new_data['concat'].unique()), 'New', 'Old')
+            self.df=self.df.merge(self.database,how='left',on='VPlate Number')
             return self.df
         except Exception as e:
             st.write(e)
@@ -149,7 +159,14 @@ class Oa_maintenance:
                     self.data=self.data[self.data['others2']==select.replace(' ','')]
                     if len(self.data['kind data'].unique())>1:
                         if not self.data.empty:
-                            self.data.drop(columns=['others2'])
+                            self.data = self.data.reset_index()
+                            self.data['Date2']=self.data['Date'].shift(1)
+                            self.data['DateDifference'] = (self.data['Date'] - self.data['Date2']).dt.days
+                            self.data['Target Total KM']=self.data['DateDifference'].astype('float')* self.data['avg km_day'].astype('float')
+                            self.data['Actual difference KM']=self.data['Current KM'].astype('float')-self.data['Last Maintenance KM'].astype('float')
+                            self.data=self.data.set_index('Date')
+                            self.data=self.data[['kind data', 'Needs', 'Quantity', 'Vehicle Type','Target Total KM','Actual difference KM','DateDifference'] + [column for column in self.data.columns if column not in ['kind data', 'Needs', 'Quantity', 'Vehicle Type','Target Total KM','Actual difference KM','DateDifference']]]
+                            self.data.drop(columns=['Date2','others','others2','concat','Letters','Numbers','new plate number_y'],inplace=True)
                             st.dataframe(self.data)
             else:
                 pass
@@ -158,7 +175,7 @@ class Oa_maintenance:
 
 if 'category' not in st.session_state:
     st.session_state.category= 'Select Category'
-oa=Oa_maintenance(old_data)
+oa=Oa_maintenance(old_data,database)
 if check :
     oa.check_type()
 if uploaded_file:
