@@ -30,6 +30,9 @@ needs=old_data['Needs'].unique().tolist()
 old_data['Date'] = pd.to_datetime(old_data[['Year', 'Month', 'Day']], format='%Y-%m-%d')
 old_data.drop(columns=['Year', 'Month', 'Day'],inplace=True)
 needs_catgory=old_data['Needs'].unique().tolist()
+old_data['new plate number']=old_data['Letters']+old_data['Numbers']
+old_data['VPlate Number']=old_data['new plate number']
+old_data.drop(columns=['plate number','Letters','Numbers'],inplace=True)
 category=['Select Category', 'All'] + needs_catgory
 select=st.sidebar.selectbox('Category',category)
 check=st.sidebar.button('Check')
@@ -46,7 +49,6 @@ class Oa_maintenance:
                 year_sheets = [sheet for sheet in sheet_names if 'Quantity' in pd.read_excel(uploaded_file, sheet_name=sheet).to_string(index=False)]
             sheets = [i for i in year_sheets]
             self.new_data = pd.read_excel(uploaded_file, sheet_name=sheets[0])
-            st.dataframe(self.new_data)
             letter = {
                 'A': 'ا',
                 'B': 'ب',
