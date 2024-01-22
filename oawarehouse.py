@@ -36,9 +36,14 @@ old_data.drop(columns=['plate number','Letters','Numbers'],inplace=True)
 category=['Select Category', 'All'] + needs_catgory
 select=st.sidebar.selectbox('Category',category)
 check=st.sidebar.button('Check')
+worksheet1 = sh.get_worksheet(1)
+all_values = worksheet1.get_all_values()
+database = pd.DataFrame(all_values[1:], columns=all_values[0])
+
 class Oa_maintenance:
-    def __init__(self,old_data):
+    def __init__(self,old_data,database):
         self.old_data=old_data
+        self.database=database
     def df_(self):
         try:
             xls = pd.ExcelFile(uploaded_file)
@@ -123,22 +128,33 @@ class Oa_maintenance:
             self.new_data[['Letters', 'Numbers']] = self.new_data['plate number'].apply(lett_num).apply(pd.Series)
             self.new_data['new plate number']=self.new_data['Letters']+self.new_data['Numbers']
             self.new_data.rename(columns={self.new_data.columns[5]:'VPlate Number'},inplace=True)
-            self.new_data['VPlate Number']=self.new_data['new plate number']
-            self.new_data['Date'] = pd.to_datetime(self.new_data[['Year', 'Month', 'Day']], format='%Y-%m-%d')
+            self.new_data['VPlate Number']=self.new_data['new plate number']  
+            self.new_data['Date'] = pd.to_datetime(self.new_data[['Year', 'Month', 'Day']], format='%Y-%m-%d')  
             self.new_data.drop(columns=['Year', 'Month', 'Day','Letters', 'Numbers','plate number'],inplace=True)
             self.df=pd.concat([self.old_data,self.new_data],join='outer')
-            self.new_data['concat'] = self.new_data['Date'].dt.strftime('%Y-%m-%d') + self.new_data['Needs'].astype(str)
-            self.df['concat'] = self.df['Date'].dt.strftime('%Y-%m-%d') + self.df['Needs'].astype(str)
+            self.new_data['concat'] = self.new_data['Date'].dt.strftime('%Y-%m-%d') + self.new_data['Needs'].astype(str)+self.new_data['VPlate Number'].astype(str)
+            self.df['concat'] = self.df['Date'].dt.strftime('%Y-%m-%d') + self.df['Needs'].astype(str)+self.df['VPlate Number'].astype(str)
             self.df['kind data'] = np.where(self.df['concat'].isin(self.new_data['concat'].unique()), 'New', 'Old')
+            self.df=self.df[self.df['VPlate Number'].isin(self.new_data['VPlate Number'].unique())]
+            self.df=self.df[self.df['VPlate Number'].isna()==False]
+            self.database[['Letters', 'Numbers']] =self.database['Vehicle ID'].apply(lett_num).apply(pd.Series)
+            self.database['VPlate Number']=self.database['Letters']+self.database['Numbers']
+            self.df=self.df.merge(self.database,how='inner',on=['VPlate Number'])
             return self.df
         except Exception as e:
             st.write(e)
     def check_type(self):
         self.df=self.df_()
         self.df = self.df.set_index('Date').sort_index()
-        self.df=self.df[['kind data', 'Needs', 'Quantity', 'Vehicle Type'] + [column for column in self.df.columns if column not in ['kind data', 'Needs', 'Quantity', 'Vehicle Type']]]
+        self.df['Current KM'].replace('None', 0, inplace=True)
+        self.df['Last Maintenance KM'].replace('None', 0, inplace=True)
+        self.df['Current KM'] = self.df['Current KM'].astype(float)
+        self.df['Last Maintenance KM'] = self.df['Last Maintenance KM'].astype(float)
+        self.df['difference between current and past km']=self.df['Current KM']-self.df['Last Maintenance KM']
+        self.df=self.df[['kind data', 'Needs', 'Quantity', 'Vehicle Type','days to change oil','km to change oil','avg km_day','difference between current and past km'] + [column for column in self.df.columns if column not in ['kind data', 'Needs', 'Quantity', 'Vehicle Type','days to change oil','km to change oil','avg km_day','difference between current and past km']]]
         self.df['others']=self.df['VPlate Number'].str.replace(' ','')
         self.df['others2']=self.df['Needs'].str.replace(' ','')
+        
         for car in self.df['others'].unique():
             self.data=self.df[self.df['others']==car.replace(' ','')]
             self.data.drop(columns=['others'])
@@ -146,6 +162,7 @@ class Oa_maintenance:
                 if select=='All':
                     if not self.data.empty:
                             st.write(car.replace(' ',''))
+                            self.data = self.data.iloc[:, :-8]
                             st.dataframe(self.data)
                     else:
                         pass
@@ -156,6 +173,7 @@ class Oa_maintenance:
                     if len(self.data['kind data'].unique())>1:
                         if not self.data.empty:
                             self.data.drop(columns=['others2'])
+                            self.data = self.data.iloc[:, :-8]
                             st.dataframe(self.data)
             else:
                 pass
@@ -164,7 +182,7 @@ class Oa_maintenance:
 
 if 'category' not in st.session_state:
     st.session_state.category= 'Select Category'
-oa=Oa_maintenance(old_data)
+oa=Oa_maintenance(old_data,database)
 if check :
     oa.check_type()
 if uploaded_file:
