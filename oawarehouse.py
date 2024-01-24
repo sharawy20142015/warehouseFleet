@@ -148,8 +148,8 @@ class Oa_maintenance:
         self.df = self.df.set_index('Date').sort_index()
         self.df['Current KM'].replace('None', 0, inplace=True)
         self.df['Last Maintenance KM'].replace('None', 0, inplace=True)
-        self.df['Current KM'] = self.df['Current KM'].astype(float)
-        self.df['Last Maintenance KM'] = self.df['Last Maintenance KM'].astype(float)
+        self.df['Current KM'] = pd.to_numeric(self.df['Current KM'], errors='coerce')
+        self.df['Last Maintenance KM'] = pd.to_numeric(self.df['Last Maintenance KM'], errors='coerce')
         self.df['difference between current and past km']=self.df['Current KM']-self.df['Last Maintenance KM']
         self.df=self.df[['kind data', 'Needs', 'Quantity', 'Vehicle Type','days to change oil','km to change oil','avg km_day','difference between current and past km'] + [column for column in self.df.columns if column not in ['kind data', 'Needs', 'Quantity', 'Vehicle Type','days to change oil','km to change oil','avg km_day','difference between current and past km']]]
         self.df['others']=self.df['VPlate Number'].str.replace(' ','')
