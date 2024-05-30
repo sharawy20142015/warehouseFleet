@@ -39,7 +39,12 @@ check=st.sidebar.button('Check')
 worksheet1 = sh.get_worksheet(1)
 all_values = worksheet1.get_all_values()
 database = pd.DataFrame(all_values[1:], columns=all_values[0])
-
+plats=st.text_input('')
+if plats:
+    car=old_data[old_data['VPlate Number'].str.contains(plats)]
+    st.dataframe(car)
+else:
+    print('not exist')
 class Oa_maintenance:
     def __init__(self,old_data,database):
         self.old_data=old_data
